@@ -21,7 +21,7 @@ message = {
     'msgtype': 'Identity',
     'services': {
         'ftp': {
-        'port': 21,
+        'port': 30000,
         'addresses': ['10.10.42.59']
     },
     'rpc': {
@@ -59,5 +59,5 @@ sock.settimeout(0.2)
 # message = b"your very important message"
 while True:
     sock.sendto(b, ('<broadcast>', 54546))
-    print("message sent!")
+    print("Sending discovery json to broadcast 54546")
     time.sleep(1)

@@ -5,8 +5,8 @@
 DataReceiver::DataReceiver(QObject *parent) : QUdpSocket(parent)
 {
     m_socket = new QUdpSocket(this);
-//    m_frameData = new QByteArray();
     connect(m_socket, SIGNAL(readyRead()), this, SLOT(readPendingDatagrams()));
+    connect(m_socket, SIGNAL(connected()), this, SLOT(onConnected()));
 
     m_buffer = new DataBuffer();
     m_buffer->open(QIODevice::ReadWrite);
@@ -29,18 +29,17 @@ void DataReceiver::readPendingDatagrams()
         m_socket->readDatagram(datagram.data(), datagram.size(),
                                 &sender, &senderPort);
 
-        std::cout << "Receiving data from " << qPrintable(sender.toString()) << " at port " << qPrintable(QString::number(senderPort)) << std::endl;
-        std::cout << "Printing datagram's data size " << qPrintable(QString::number(datagram.size())) << std::endl;
+        qWarning() << "[DATA RECEIVER] Receiving data from " << qPrintable(sender.toString()) << " at port " << qPrintable(QString::number(senderPort));
+        qWarning() << "[DATA RECEIVER] Printing datagram's data size " << qPrintable(QString::number(datagram.size()));
 
-        QString output;
-        output += QString(datagram);
-        onReadyRead(datagram);
+        if (sender.toString() == m_address)
+            onReadyRead(datagram);
    }
 }
 
 bool DataReceiver::bind(const QHostAddress& address, quint16 port /*= 0*/, StreamingMode mode /*= StreamingMode::Unicast*/)
 {
-    std::cout << "Connecting to ip " << address.toString().toUtf8().constData() << " at port " << QString::number(port).toUtf8().constData() << "." << std::endl;
+    qWarning() << "[DATA RECEIVER] Binding to ip " << address.toString().toUtf8().constData() << " at port " << QString::number(port).toUtf8().constData() << ".";
 
 	if (m_socket->state() != QAbstractSocket::BoundState)
 	{
@@ -48,7 +47,7 @@ bool DataReceiver::bind(const QHostAddress& address, quint16 port /*= 0*/, Strea
         {
             if (m_socket->bind(address, port, QUdpSocket::ShareAddress | QUdpSocket::ReuseAddressHint) == false)
             {
-                qDebug() << "error 1 is " << m_socket->errorString();
+                qDebug() << "[DATA RECEIVER] error 1 is " << m_socket->errorString();
                 return false;
             }
         }
@@ -56,32 +55,63 @@ bool DataReceiver::bind(const QHostAddress& address, quint16 port /*= 0*/, Strea
         {
             if (m_socket->bind(QHostAddress::AnyIPv4, port, QUdpSocket::ShareAddress | QAbstractSocket::ReuseAddressHint) == false)
             {
-                qDebug() << "error 2 is " << m_socket->errorString();
+                qDebug() << "[DATA RECEIVER] error 2 is " << m_socket->errorString();
                 return false;
             }
 
             if (m_socket->joinMulticastGroup(address) == false)
             {
-                qDebug() << "error 3 is " << m_socket->errorString();
+                qDebug() << "[DATA RECEIVER] error 3 is " << m_socket->errorString();
                 return false;
             }
         }
 	}
 	else
 	{
-        qDebug() << "Socket already bound";
+        qDebug() << "[DATA RECEIVER] Socket already bound";
         return false;
 	}
 
-    m_address = address;
-    m_port = port;
+//    m_address = address;
+//    m_portFTP = port;
     m_streamingMode = mode;
     connect(m_socket, SIGNAL(readyRead()), this, SLOT(readPendingDatagrams()));
     return true;
 }
 
-bool DataReceiver::bind(const QString& maddress, int port /*= 0*/){
-    return bind(QHostAddress(maddress), static_cast<quint16>(port) /*= 0*/, StreamingMode::Unicast);
+bool DataReceiver::bind(const QString& deviceAddress, int portFTP, int portRPC, const QString& localAddress){
+    m_address = deviceAddress;
+    m_portFTP = portFTP;
+    m_portRPC = portRPC;
+    return bind(QHostAddress(localAddress), static_cast<quint16>(portFTP) /*= 0*/, StreamingMode::Unicast);
+}
+
+bool DataReceiver::connectDevice(const QString& deviceIp, const QString& port, const QString& localAddress){
+
+    qWarning() << "[DATA RECEIVER] Connecting to ip " << deviceIp << " at port " << port << ".";
+    m_address = deviceIp;
+    m_portFTP = port.toUShort();
+    connect(m_socket, SIGNAL(readyRead()), this, SLOT(readPendingDatagrams()));
+
+//    qWarning() << m_socket->bind(QHostAddress(localAddress), 8000, QUdpSocket::ShareAddress | QUdpSocket::ReuseAddressHint);
+//    qWarning() << m_socket->errorString();
+
+    if (m_socket->state() != QAbstractSocket::BoundState)
+    {
+        m_socket->connectToHost(QHostAddress(deviceIp), port.toUShort());
+    }
+    else
+    {
+        qDebug() << "[DATA RECEIVER] Socket already connected";
+        return false;
+    }
+
+    return true;
+}
+
+void DataReceiver::onConnected(){
+    qWarning() << "[DATA RECEIVER] Connection to " << m_address << ":" << QString::number(m_portFTP).toUtf8().constData() << " established";
+    connect(m_socket, SIGNAL(readyRead()), this, SLOT(readPendingDatagrams()));
 }
 
 bool DataReceiver::send(const QString& address, int port, const QString& msg){
@@ -112,13 +142,14 @@ QImage DataReceiver::getLastReadLine(int width, int height){
 
 void DataReceiver::close()
 {
+    qWarning() << "[DATA RECEIVER] Disconnecting from " << m_address << ":" << QString::number(m_portFTP).toUtf8().constData() << ".";
+    m_socket->disconnectFromHost();
     m_socket->close();
 }
 
 
 void DataReceiver::onReadyRead(QByteArray chunk)
 {
-
     if (StreamableFrame::isFrame(chunk))
     {
         m_expectingFrame = true;
@@ -169,14 +200,14 @@ void DataReceiver::onReadyRead(QByteArray chunk)
 
             m_expectingFrame = false;
 
-            std::cout << "Incoming dimensions: width = " << frame.size().width() << " height = " << frame.size().height() << std::endl;
+//            std::cout << "Incoming dimensions: width = " << frame.size().width() << " height = " << frame.size().height() << std::endl;
 
             // Lock the read/write lock
             m_buffer->mutex.tryLock(1000);
             m_buffer->append(frame.data(), frame.size().width() * frame.size().height());
             m_buffer->mutex.unlock();
 
-            std::cout << "Emit signal newDataReceived with data size of " << m_buffer->size() << std::endl;
+//            std::cout << "Emit signal newDataReceived with data size of " << m_buffer->size() << std::endl;
             emit newDataReceived(frame.data(), m_buffer->size());
             m_buffer->setLastAddedLineIndex(static_cast<qint16>(m_buffer->size()), frame.size().width() * frame.size().height());
             m_frameData.clear();

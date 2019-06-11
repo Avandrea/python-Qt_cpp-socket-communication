@@ -1,6 +1,7 @@
 import QtQuick 2.9
 import QtQuick.Window 2.2
 import QtQuick.Controls 2.5
+import QtQuick.Controls 1.4 as M1
 import QtQuick.Controls.Styles 1.4
 import QtQuick.Extras 1.4
 import QtGraphicalEffects 1.0
@@ -11,11 +12,13 @@ import MyImageItem 1.0
 Window {
     id: mainWindow
     visible: true
-    width: 1920
-    height: 1080
+    width: 1300
+    height: 800
     title: qsTr("Hello World")
-    minimumWidth: 1700
+    minimumWidth: 1080
     minimumHeight: 720
+
+    property string localhost: "0.0.0.0"
 
     property int smallMargins: 5
     property int componentsHeight: height * 0.08
@@ -27,6 +30,24 @@ Window {
     property color secondary: "#26a69a"
     property color secondaryLight: "#64d8cb"
 
+    property var selectedDevice
+    property int selectedRow: -1
+
+    property var modelIp: [
+        {"ip": "192.168.0.22"},
+        {"ip": "192.168.0.155"},
+        {"ip": "192.168.0.555"},
+        {"ip": "192.168.0.555"},
+        {"ip": "192.168.0.555"}
+    ]
+
+    function closeDiscovery(){
+        deviceDiscovery.close()
+        btn_discovery.mChecked = false
+        btn_discovery.text = "Start discovery"
+        timer_discovery.stop()
+    }
+
 
     DataReceiver{
         id: dataReceiver
@@ -37,6 +58,23 @@ Window {
     }
     DeviceDiscovery{
         id: deviceDiscovery
+        onAddressStringListChanged: {
+            modelIp = []
+            Object.keys(addressList).forEach(function(key){
+                modelIp.push({"ip": key, "portFTP": addressList[key]["portFTP"], "portRPC": addressList[key]["portRPC"]})
+            })
+            modelIpChanged()
+        }
+    }
+
+    Timer {
+        id: timer_discovery
+        running: false
+        repeat: false
+        interval: 5000
+        onTriggered: {
+            closeDiscovery()
+        }
     }
 
     Rectangle {
@@ -50,6 +88,18 @@ Window {
             }
     }
 
+
+    Button {
+        width: 100
+        height: 100
+        text: "click meee"
+        anchors.right: parent.right
+        anchors.bottom: parent.bottom
+        onClicked: {
+            console.log("*********** ", selectedDevice)
+        }
+    }
+
     Column {
         id: column_left
         width: parent.width * 0.1
@@ -60,15 +110,23 @@ Window {
         spacing: 5
         Button{
             id: btn_discovery
+            property bool mChecked: false
             width: parent.width
             height: componentsHeight
-            text: "Discovery"
+            text: "Start discovery"
             background: Rectangle {
                     anchors.fill: parent
                     color: primaryLight
             }
             onClicked: {
-                deviceDiscovery.discovery() //54546
+                if (!btn_discovery.mChecked && isConnected === false){
+                    deviceDiscovery.discovery() //54546
+                    btn_discovery.mChecked = true
+                    btn_discovery.text = "Stop discovery"
+                    timer_discovery.start()
+                }
+                else
+                    closeDiscovery()
             }
         }
         Rectangle {
@@ -77,24 +135,21 @@ Window {
             height: listview_discovery.height
             color: secondaryLight
             border.color: secondary
-            MouseArea{
-                anchors.fill: parent
-                onClicked: console.log((listview_discovery.model.length * listview_delegate.height))
-
-            }
-            ListView {
+            M1.TableView {
                 id: listview_discovery
                 width: parent.width
                 height: listViewComponentsHeight + listview_discovery.model.length * listViewComponentsHeight
                 anchors.top: rectangle_discovery.top
                 anchors.topMargin: 0
-                spacing: 0
-                model: [
-                    {"ip": "192.168.0.22", "port": "42222"},
-                    {"ip": "192.168.0.155", "port": "42564"},
-                    {"ip": "192.168.0.555", "port": "38"}
-                ]
-                header: Text{
+                model: modelIp
+                horizontalScrollBarPolicy: Qt.ScrollBarAlwaysOff
+                verticalScrollBarPolicy: Qt.ScrollBarAlwaysOff
+                backgroundVisible: false
+                style: TableViewStyle{
+                        textColor: "white"
+                        alternateBackgroundColor: "transparent"
+                    }
+                headerDelegate: Text{
                     id: listview_header
                     width: parent.width
                     height: listViewComponentsHeight
@@ -105,22 +160,41 @@ Window {
                     font.bold: true
                     text: "Available devices"
                 }
-                delegate: Rectangle {
+                itemDelegate: Rectangle {
                     id: listview_delegate
                     width: parent.width
                     height: listViewComponentsHeight
+                    property int row: styleData.row
                     color: "transparent"
                     border.color: secondary
+                    MouseArea {
+                        anchors.fill: parent
+                        onClicked: {
+                            selectedDevice = modelIp[row]
+                            selectedRow = row
+                        }
+                    }
                     Text {
                         id: text_listView
                         width: parent.width
                         height: parent.height
                         horizontalAlignment: Text.AlignHCenter
                         verticalAlignment: Text.AlignVCenter
-                        text: listview_discovery.model[index]["ip"] + ":" + listview_discovery.model[index]["port"]
+                        text: listview_discovery.model[row] ? listview_discovery.model[row]["ip"] : ""
                         font.pointSize: 12
                         color: "black"
                     }
+                }
+                rowDelegate: Rectangle{
+                    height: listViewComponentsHeight
+                    property int row: styleData.row
+                    color: row == selectedRow ? primary : "transparent"
+                }
+
+
+                M1.TableViewColumn{
+                    role: "ip"
+                    width: rectangle_discovery.width
                 }
             }
         }
@@ -147,11 +221,21 @@ Window {
                     color: mainWindow.isConnected ? "#02ee80" : "#ee0a02"
             }
             onClicked: {
-                if (!btn_connect.mChecked){
-                    isConnected = dataReceiver.bind("127.0.0.1", 8001)
-                    dataReceiver.send("127.0.0.1", 8000, "send me the image")
-                    btn_connect.mChecked = true
-                    btn_connect.text = "Disconnect"
+                closeDiscovery()
+                console.log(selectedDevice["ip"], selectedDevice["portRPC"], selectedDevice["portFTP"])
+
+                if (!btn_connect.mChecked && typeof selectedDevice !== 'undefined'){
+                    isConnected = dataReceiver.bind(selectedDevice["ip"], selectedDevice["portFTP"], selectedDevice["portRPC"])
+//                    isConnected = dataReceiver.connectDevice(selectedDevice["ip"], selectedDevice["portFTP"])
+                    if (isConnected === true){
+                        console.log("Sending message to ", selectedDevice["ip"])
+                        dataReceiver.send(selectedDevice["ip"], 54547, "send me the image")
+                        btn_connect.mChecked = true
+                        btn_connect.text = "Disconnect"
+                    }
+                    else if (typeof isConnected === 'undefined'){
+                        isConnected = false
+                    }
                 }
                 else{
                     dataReceiver.close()

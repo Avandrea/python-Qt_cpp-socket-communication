@@ -28,7 +28,27 @@ class DataReceiver: public QUdpSocket
 public:
     DataReceiver(QObject* parent = Q_NULLPTR);
     ~DataReceiver();
-    Q_INVOKABLE bool bind(const QString& address, int port);
+
+    /**
+        Binds the client to the port obtained from the discovery for receiving data. It should be port 22, but the discovery manages this by itself.
+        It also sets the selectedDevice as an incoming device
+
+        @param deviceIp the device ip as a string that will be used for the connection
+        @param localAddress the local address to bind the port to
+        @return true if the connection succeded and false otherwise
+    */
+    Q_INVOKABLE bool connectDevice(const QString& deviceIp, const QString& port, const QString& localAddress = "0.0.0.0");
+
+    /**
+        Binds the client to the port obtained from the discovery for receiving data. It should be port 22, but the discovery manages this by itself.
+        It also sets the selectedDevice as an incoming device
+
+        @param deviceAddress the device ip as a string that will be used for the connection
+        @param localAddress the local address to bind the port to
+        @return true if the connection succeded and false otherwise
+    */
+    Q_INVOKABLE bool bind(const QString& deviceAddress, int portFTP, int portRPC, const QString& address = "0.0.0.0");
+
     bool bind(const QHostAddress& address, quint16 port = 0, StreamingMode mode = StreamingMode::Unicast);
     Q_INVOKABLE bool send(const QString& address, int port, const QString& msg);
     Q_INVOKABLE QImage getLastAddedLine(int width, int height);
@@ -42,13 +62,15 @@ Q_SIGNALS:
     void newDataReceived(QByteArray array, qint64 bufferSize);
 
 protected Q_SLOTS:
+    void onConnected();
     void onReadyRead(QByteArray chunk);
     void readPendingDatagrams();
 
 protected:
     QList<QString> m_addressList;
-    QHostAddress m_address;
-    int m_port;
+    QString m_address;
+    int m_portFTP;
+    int m_portRPC;
     StreamingMode m_streamingMode;
     bool m_expectingFrame;
     QUdpSocket *m_socket;

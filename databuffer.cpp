@@ -50,7 +50,7 @@ QByteArray DataBuffer::getLastReadLine(qint64 dataSize){
     this->seek(m_lastReadLine);
     QByteArray retByteArray = this->peek(dataSize);
     if (m_lastReadLine + dataSize < this->size() || m_lastReadLine == 0){
-        std::cout << "---------------- " << m_lastReadLine << " + " << dataSize << " <= " << this->size() << std::endl;
+//        std::cout << "---------------- " << m_lastReadLine << " + " << dataSize << " <= " << this->size() << std::endl;
         m_lastReadLine += dataSize;
     }
 
@@ -69,7 +69,7 @@ void DataBuffer::setLastAddedLineIndex(qint16 lastAddedLine, int frameSize){
     else
         m_lastAddedLine = lastAddedLine - frameSize;
 
-    std::cout << "################# m LAST ADDED INDEX: " << m_lastAddedLine << std::endl;
+//    std::cout << "################# m LAST ADDED INDEX: " << m_lastAddedLine << std::endl;
 }
 qint64 DataBuffer::getLastAddedLineIndex(){
     return m_lastAddedLine;
