@@ -30,13 +30,14 @@ quint32 StreamableFrame::startSequence()
 
 bool StreamableFrame::isFrame(const QByteArray& buffer)
 {
+
     QByteArray frame = buffer;
     QDataStream stream(&frame, QIODevice::ReadOnly);
     quint32 start = 0;
     stream >> start;
 
-    if (start != startSequence())
-        std::cout << "StreamableFrame::isFrame failed: start (" << start << ") != startSequence(" << startSequence() << ")" << std::endl;
+//    if (start != startSequence())
+//        qDebug() << "[STREAMABLEFRAME::isFrame] failed: start (" << start << ") != startSequence(" << startSequence() << ")";
 
     return start == startSequence();
 }
@@ -46,14 +47,13 @@ bool StreamableFrame::isComplete(const QByteArray& streamedBuffer)
 {
 	if (streamedBuffer.size() < m_headerSize)
 	{
-        std::cout << "StreamableFrame::isComplete received too small buffer: can't contain a valid header." << std::endl;
-//		qDebug() << "StreamableFrame::isComplete received too small buffer: can't contain a valid header.";
+        qDebug() << "StreamableFrame::isComplete received too small buffer: can't contain a valid header.";
 		return false;
 	}
 
     if (!isFrame(streamedBuffer))
     {
-        // Not a frames
+        // Not a new frame
         return false;
     }
 
@@ -94,9 +94,10 @@ bool StreamableFrame::isComplete(const QByteArray& streamedBuffer)
     int expectedSize = m_headerSize + metadataSize + dataSize + timestampSize;
     int sizeNow = streamedBuffer.size();
 
-    if (sizeNow != expectedSize)
-        std::cout << "StreamableFrame::isComplete: size " << sizeNow << " != " << expectedSize << " (= m_headerSize + metadataSize + dataSize + timestampSize)" << std::endl;
+//    if (sizeNow == expectedSize)
+//        qDebug() << "[STREAMABLEFRAME::isComplete]: size " << sizeNow << " != " << expectedSize << " (= m_headerSize + metadataSize + dataSize + timestampSize)";
 
+//    qDebug() << "[STREAMABLEFRAME] received header values are: " << start << frameNumber << size << dataType << metadataSize << dataSize << timestampCount << expectedSize << sizeNow << timestampSize;
     return sizeNow == expectedSize;
 }
 
@@ -192,7 +193,7 @@ bool StreamableFrame::extract(const QByteArray& streamedBuffer)
 
     bool headerValid = 0 == headerChecksum;
 //    bool validMetadata = Checksum::fletcher16Checksum(const_cast<quint8*>(reinterpret_cast<const quint8*>(metadata.constData())), metadata.size()) == metadataChecksum;
-    bool validMetadata = 0 == metadataChecksum; // = fletcher16(const_cast<quint8*>(reinterpret_cast<const quint8*>(metadata.constData())), static_cast<unsigned long>(metadata.size())) == metadataChecksum;
+    bool validMetadata = true; // 0 == metadataChecksum; // = fletcher16(const_cast<quint8*>(reinterpret_cast<const quint8*>(metadata.constData())), static_cast<unsigned long>(metadata.size())) == metadataChecksum;
     bool validData = 0 == dataChecksum;
 
     if (headerValid && validMetadata && validData)

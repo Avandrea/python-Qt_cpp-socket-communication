@@ -1,3 +1,14 @@
+/**
+ *  BMCR_SpectralClassification
+ *  @file devicediscovery.h
+ *  @brief this class manages the discovery of new devices
+ *  The discovery waits for any incoming byte array at a specific port (the documentation for the Specim camera define it as 54546).
+ *  When an elements comes in, it is parsed as a JSON and the program checks wheter it contains a field "publisher" equal to "Specim"
+ *  and a field "services". If it is the case the ip and the relative ports are added to the list of devices.
+ *  @author Andrea Avigni
+ *  @version 1.0 11/06/2019
+*/
+
 #ifndef DEVICEDISCOVERY_H
 #define DEVICEDISCOVERY_H
 

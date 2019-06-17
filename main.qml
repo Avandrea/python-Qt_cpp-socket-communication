@@ -6,6 +6,7 @@ import QtQuick.Controls.Styles 1.4
 import QtQuick.Extras 1.4
 import QtGraphicalEffects 1.0
 import MyDeviceDiscovery 1.0
+import MyCameraControl 1.0
 import MyDataReceiver 1.0
 import MyImageItem 1.0
 
@@ -51,9 +52,11 @@ Window {
 
     DataReceiver{
         id: dataReceiver
-        onNewDataReceived: {
+        onNextFrame: {
             // receiving QByteArray array, qint64 bufferSize
-            label_bufferSize.text = bufferSize + ""
+//            label_bufferSize.text = bufferSize + ""
+
+            console.log(size, frameNumber, type)
         }
     }
     DeviceDiscovery{
@@ -61,10 +64,14 @@ Window {
         onAddressStringListChanged: {
             modelIp = []
             Object.keys(addressList).forEach(function(key){
-                modelIp.push({"ip": key, "portFTP": addressList[key]["portFTP"], "portRPC": addressList[key]["portRPC"]})
+                modelIp.push({"ip": key, "portFTP": addressList[key]["portFTP"], "portRPC": addressList[key]["portRPC"], "ipMulticast": addressList[key]["ipMulticast"], "portMulticast": addressList[key]["portMulticast"]})
             })
             modelIpChanged()
         }
+    }
+
+    CameraControl{
+        id: cameraControl
     }
 
     Timer {
@@ -96,7 +103,7 @@ Window {
         anchors.right: parent.right
         anchors.bottom: parent.bottom
         onClicked: {
-            console.log("*********** ", selectedDevice)
+            cameraControl.launchCommand()
         }
     }
 
@@ -172,6 +179,9 @@ Window {
                         onClicked: {
                             selectedDevice = modelIp[row]
                             selectedRow = row
+
+                            // Enable udp streaming
+                            cameraControl.startStreaming(selectedDevice["ipMulticast"], selectedDevice["portMulticast"])
                         }
                     }
                     Text {
@@ -221,15 +231,20 @@ Window {
                     color: mainWindow.isConnected ? "#02ee80" : "#ee0a02"
             }
             onClicked: {
+                // Connect the data transmission socket
                 closeDiscovery()
-                console.log(selectedDevice["ip"], selectedDevice["portRPC"], selectedDevice["portFTP"])
+
+                console.log(selectedDevice["ip"], selectedDevice["portRPC"], selectedDevice["portFTP"], selectedDevice["ipMulticast"], selectedDevice["portMulticast"])
 
                 if (!btn_connect.mChecked && typeof selectedDevice !== 'undefined'){
-                    isConnected = dataReceiver.bind(selectedDevice["ip"], selectedDevice["portFTP"], selectedDevice["portRPC"])
-//                    isConnected = dataReceiver.connectDevice(selectedDevice["ip"], selectedDevice["portFTP"])
+                    isConnected = dataReceiver.bind(selectedDevice["ipMulticast"], selectedDevice["portFTP"], selectedDevice["portRPC"], selectedDevice["portMulticast"])
                     if (isConnected === true){
-                        console.log("Sending message to ", selectedDevice["ip"])
-                        dataReceiver.send(selectedDevice["ip"], 54547, "send me the image")
+//                        console.log("Sending message to ", selectedDevice["ip"])
+//                        dataReceiver.send(selectedDevice["ip"], 54547, "send me the image")
+
+                        // Enable udp streaming
+                        cameraControl.startStreaming(selectedDevice["ipMulticast"], selectedDevice["portMulticast"])
+
                         btn_connect.mChecked = true
                         btn_connect.text = "Disconnect"
                     }
@@ -242,7 +257,14 @@ Window {
                     isConnected = false
                     btn_connect.mChecked = false
                     btn_connect.text = "Connect"
+
+                    // Disable udp streaming
+                    cameraControl.stopStreaming(selectedDevice["ipMulticast"], selectedDevice["portMulticast"])
                 }
+
+                // Connect the camera control socket
+                var isRPCConnected = cameraControl.connectDevice(selectedDevice["ip"], selectedDevice["portRPC"])
+                console.log("----------- " , isRPCConnected)
             }
         }
 

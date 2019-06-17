@@ -1,4 +1,11 @@
-// ImageItem.h
+/**
+ *  BMCR_SpectralClassification
+ *  @file imageitem.h
+ *  @brief this class manages the representation of the incoming data as images.
+ *  @author Andrea Avigni
+ *  @version 1.0 11/06/2019
+*/
+
 #ifndef IMAGEITEM_H
 #define IMAGEITEM_H
 #include <QQuickPaintedItem>

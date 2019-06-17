@@ -6,7 +6,7 @@ DataReceiver::DataReceiver(QObject *parent) : QUdpSocket(parent)
 {
     m_socket = new QUdpSocket(this);
     connect(m_socket, SIGNAL(readyRead()), this, SLOT(readPendingDatagrams()));
-    connect(m_socket, SIGNAL(connected()), this, SLOT(onConnected()));
+//    connect(m_socket, SIGNAL(connected()), this, SLOT(onConnected()));
 
     m_buffer = new DataBuffer();
     m_buffer->open(QIODevice::ReadWrite);
@@ -29,11 +29,10 @@ void DataReceiver::readPendingDatagrams()
         m_socket->readDatagram(datagram.data(), datagram.size(),
                                 &sender, &senderPort);
 
-        qWarning() << "[DATA RECEIVER] Receiving data from " << qPrintable(sender.toString()) << " at port " << qPrintable(QString::number(senderPort));
-        qWarning() << "[DATA RECEIVER] Printing datagram's data size " << qPrintable(QString::number(datagram.size()));
+//        qWarning() << "[DATA RECEIVER] Receiving data from " << qPrintable(sender.toString()) << " at port " << qPrintable(QString::number(senderPort));
+//        qWarning() << "[DATA RECEIVER] Printing datagram's data size " << qPrintable(QString::number(datagram.size()));
 
-        if (sender.toString() == m_address)
-            onReadyRead(datagram);
+        onReadyRead(datagram);
    }
 }
 
@@ -79,11 +78,13 @@ bool DataReceiver::bind(const QHostAddress& address, quint16 port /*= 0*/, Strea
     return true;
 }
 
-bool DataReceiver::bind(const QString& deviceAddress, int portFTP, int portRPC, const QString& localAddress){
+bool DataReceiver::bind(const QString& deviceAddress, int portFTP, int portRPC, int portMulticast, const QString& localAddress){
     m_address = deviceAddress;
+    m_portMulticast = portMulticast;
     m_portFTP = portFTP;
     m_portRPC = portRPC;
-    return bind(QHostAddress(localAddress), static_cast<quint16>(portFTP) /*= 0*/, StreamingMode::Unicast);
+
+    return bind(QHostAddress(deviceAddress), static_cast<quint16>(m_portMulticast) /*= 0*/, StreamingMode::Multicast);
 }
 
 bool DataReceiver::connectDevice(const QString& deviceIp, const QString& port, const QString& localAddress){
@@ -153,6 +154,10 @@ void DataReceiver::onReadyRead(QByteArray chunk)
     if (StreamableFrame::isFrame(chunk))
     {
         m_expectingFrame = true;
+
+        // Check whether an header is received before the end of the previous line
+        if (StreamableFrame::isComplete(m_frameData))
+            m_frameData.clear();
     }
 
     if (m_expectingFrame)
@@ -167,49 +172,46 @@ void DataReceiver::onReadyRead(QByteArray chunk)
             if (frame.extract(m_frameData))
             {
                 // Check Metadata: if it exists and contains a field bufferType do some stuff
-                /*
                 QJsonObject json = frame.metadata();
-				QString bufferType = json["bufferType"].toString("not_defined");
+                QString bufferType = json["bufferType"].toString("not_defined");
 
-				if (bufferType == "line")
-				{
-					emit nextLine(frame.data(), frame.size().width(), frame.frameNumber());
-				}
-				else if (bufferType == "lineBatch")
-				{
-					QJsonArray lineNumbersArray = json["lineNumbers"].toArray();
+                if (bufferType == "line")
+                {
+                    emit nextLine(frame.data(), frame.size().width(), frame.frameNumber());
+                }
+                else if (bufferType == "lineBatch")
+                {
+                    QJsonArray lineNumbersArray = json["lineNumbers"].toArray();
                     QVector<quint32> lineNumbers;
 
-					for (QJsonValue number : lineNumbersArray)
-					{
-						lineNumbers << number.toInt();
-					}
+                    for (QJsonValue number : lineNumbersArray)
+                    {
+                        lineNumbers << number.toInt();
+                    }
 
-					emit nextLineBatch(frame.data(), frame.size().height(), frame.size().width(), lineNumbers);					
-				}
-				else if (bufferType == "frame")
-				{
-					emit nextFrame(frame.data(), frame.size(), frame.frameNumber(), frame.dataType());
-				}
-				else
-				{
-					qWarning() << "received unknown data";
-				}
-                */
+                    emit nextLineBatch(frame.data(), frame.size().height(), frame.size().width(), lineNumbers);
+                }
+                else if (bufferType == "frame")
+                {
+                    qDebug() << "[DATA RECEIVER] Emit signal nextFrame signal with data size of " << frame.size();
+                    emit nextFrame(frame.data(), frame.size(), frame.frameNumber(), frame.dataType());
+                }
+                else
+                {
+                    qWarning() << "received unknown data";
+                }
+
+                // Lock the read/write lock and append to the buffer
+//                m_buffer->mutex.tryLock(1000);
+//                m_buffer->append(frame.data(), frame.size().width() * frame.size().height());
+//                m_buffer->mutex.unlock();
+
+
+                // Set last added line
+//                m_buffer->setLastAddedLineIndex(static_cast<qint16>(m_buffer->size()), frame.size().width() * frame.size().height());
             }
 
             m_expectingFrame = false;
-
-//            std::cout << "Incoming dimensions: width = " << frame.size().width() << " height = " << frame.size().height() << std::endl;
-
-            // Lock the read/write lock
-            m_buffer->mutex.tryLock(1000);
-            m_buffer->append(frame.data(), frame.size().width() * frame.size().height());
-            m_buffer->mutex.unlock();
-
-//            std::cout << "Emit signal newDataReceived with data size of " << m_buffer->size() << std::endl;
-            emit newDataReceived(frame.data(), m_buffer->size());
-            m_buffer->setLastAddedLineIndex(static_cast<qint16>(m_buffer->size()), frame.size().width() * frame.size().height());
             m_frameData.clear();
         }
         // This part is for frames that have a valid start sequence but never complete. At some point we need to discard it.

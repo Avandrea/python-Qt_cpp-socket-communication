@@ -1,9 +1,9 @@
 /**
-    BMCR_SpectralClassification
-    @file databuffer.h
-    @brief this buffer manages the data in a circular buffer. It is used by datareceiver to handle the data
-    @author Andrea Avigni
-    @version 1.0 05/06/19
+ *  BMCR_SpectralClassification
+ *  @file databuffer.h
+ *  @brief this buffer manages the data in a circular buffer. It is used by datareceiver to handle the data
+ *  @author Andrea Avigni
+ *  @version 1.0 05/06/19
 */
 
 #ifndef DATABUFFER_H

@@ -1,3 +1,11 @@
+/**
+ *  BMCR_SpectralClassification
+ *  @file streamableframe.h
+ *  @brief this class manages the checks over the incoming frame and extract the elements from the frame
+ *  @author Andrea Avigni
+ *  @version 1.0 05/06/2019
+*/
+
 #pragma once
 
 #include <QObject>
@@ -6,13 +14,6 @@
 #include <QVector>
 
 #include <QIODevice>
-/**
-    BMCR_SpectralClassification
-    @file streamableframe.h
-    @brief this class manages the checks over the incoming frame and extract the elements from the frame
-    @author
-    @version
-*/
 
 #include <QTextStream>
 #include <QFile>
@@ -50,7 +51,7 @@ private:
     quint8 m_timestampCount = 0;
     QVector<quint32> m_timestamps;
 
-    static const quint32 m_startSequence = 0x68dd3ef4;
+    static const quint32 m_startSequence = 0x68dd3ef4; // The hex converted to int32 is = 1759330036
     static const int m_headerSize = 35;
 
     uint16_t fletcher16( uint8_t const *data, size_t bytes );

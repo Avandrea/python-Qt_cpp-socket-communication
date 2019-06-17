@@ -18,7 +18,7 @@ void DeviceDiscovery::discovery(quint16 port)
     QHostAddress sender;
     quint16 senderPort;
 
-    m_socket->bind(QHostAddress::Broadcast, port);
+    m_socket->bind(QHostAddress("192.168.1.255"), port); //QHostAddress::Broadcast
 }
 
 void DeviceDiscovery::readPendingDatagrams(){
@@ -28,6 +28,7 @@ void DeviceDiscovery::readPendingDatagrams(){
 
     while (m_socket->hasPendingDatagrams()) {
         datagram.resize(m_socket->pendingDatagramSize());
+
 
         m_socket->readDatagram(datagram.data(), datagram.size(),
                                 &sender, &senderPort);
@@ -58,23 +59,26 @@ void DeviceDiscovery::readPendingDatagrams(){
             QJsonObject jsonServices(jsonDiscovery["services"].toObject());
             QJsonObject jsonFtp = jsonServices["ftp"].toObject();
             QJsonObject jsonRpc = jsonServices["rpc"].toObject();
+            QJsonObject jsonMulticast = jsonServices["multicast"].toObject();
             QString portFTP = QString::number(jsonFtp["port"].toInt());
             QString portRPC = QString::number(jsonRpc["port"].toInt());
+            QString ipMulticast = jsonMulticast["address"].toString();
+            QString portMulticast = QString::number(jsonMulticast["port"].toInt());
 
             // Create a temporary map and insert ip, portFTP and portRPC
             QVariantMap tempMap;
-//            tempMap.insert("ip", senderString);
             tempMap.insert("portFTP", portFTP);
             tempMap.insert("portRPC", portRPC);
-//            m_addressList.insert(senderString, tempMap);
+            tempMap.insert("ipMulticast", ipMulticast);
+            tempMap.insert("portMulticast", portMulticast);
 
             QVariantMap map;
             map.insert(senderString, tempMap);
 
             // Add new ips to the string list that will be shown in the GUI
-            qWarning() << "[DEVICE DISCOVERY] adding new ip to devices list.";
+            qWarning() << "[DEVICE DISCOVERY] adding new ip to devices list. ip: " << senderString << ", Ports are: ftp: " << portFTP << " rpc: " << portRPC << " multi: " << ipMulticast << portMulticast;
             addressStringList.append(senderString);
-//            emit addressStringListChanged(addressStringList);
+
             emit addressStringListChanged(map);
         }
     }

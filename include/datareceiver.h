@@ -1,9 +1,9 @@
 /**
-    BMCR_SpectralClassification
-    @file datareceiver.h
-    @brief this is the main class, it manages the streamablefram class and the databuffer class
-    @author
-    @version
+ *  BMCR_SpectralClassification
+ *  @file datareceiver.h
+ *  @brief this is the main class, it manages the streamablefram class and the databuffer class
+ *  @author
+ *  @version
 */
 
 #include <QObject>
@@ -47,7 +47,7 @@ public:
         @param localAddress the local address to bind the port to
         @return true if the connection succeded and false otherwise
     */
-    Q_INVOKABLE bool bind(const QString& deviceAddress, int portFTP, int portRPC, const QString& address = "0.0.0.0");
+    Q_INVOKABLE bool bind(const QString& deviceAddress, int portFTP, int portRPC, int portMulticast, const QString& address = "0.0.0.0");
 
     bool bind(const QHostAddress& address, quint16 port = 0, StreamingMode mode = StreamingMode::Unicast);
     Q_INVOKABLE bool send(const QString& address, int port, const QString& msg);
@@ -59,7 +59,6 @@ Q_SIGNALS:
     void nextFrame(const QByteArray& buffer, const QSize& size, quint32 frameNumber, int type);
     void nextLine(const QByteArray& buffer, int width, quint32 frameNumber);
     void nextLineBatch(const QByteArray& batch, int batchSize, int width, const QVector<quint32>& frameNumbers);
-    void newDataReceived(QByteArray array, qint64 bufferSize);
 
 protected Q_SLOTS:
     void onConnected();
@@ -71,6 +70,8 @@ protected:
     QString m_address;
     int m_portFTP;
     int m_portRPC;
+    int m_portMulticast;
+
     StreamingMode m_streamingMode;
     bool m_expectingFrame;
     QUdpSocket *m_socket;
